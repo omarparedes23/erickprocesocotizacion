@@ -1,0 +1,163 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockTransitionCase = vi.fn();
+
+vi.mock("@/app/actions/cases", () => ({
+  transitionCase: mockTransitionCase,
+}));
+
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  }),
+}));
+
+const { advanceCase } = await import("./actions");
+
+const CASE_ID = "22222222-2222-4222-8222-222222222222";
+
+beforeEach(() => {
+  mockTransitionCase.mockReset();
+  mockTransitionCase.mockResolvedValue({ id: CASE_ID });
+});
+
+function buildFormData(fields: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    fd.set(key, value);
+  }
+  return fd;
+}
+
+describe("advanceCase", () => {
+  it("tarea automática: fuerza answer='si' aunque no venga en el form", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "recibir_solicitud",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: CASE_ID,
+        currentTaskType: "recibir_solicitud",
+        answer: "si",
+      }),
+    );
+  });
+
+  it("gateway simple: usa el answer elegido en el form", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_tdr",
+          answer: "no",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: CASE_ID,
+        currentTaskType: "revisar_tdr",
+        answer: "no",
+      }),
+    );
+  });
+
+  it("revisar_solicitud con answer='si': incluye tieneTdr como boolean (checkbox marcado)", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_solicitud",
+          answer: "si",
+          tieneTdr: "on",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentTaskType: "revisar_solicitud",
+        answer: "si",
+        tieneTdr: true,
+      }),
+    );
+  });
+
+  it("revisar_solicitud con answer='si': tieneTdr=false si el checkbox no viene marcado", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_solicitud",
+          answer: "si",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentTaskType: "revisar_solicitud",
+        answer: "si",
+        tieneTdr: false,
+      }),
+    );
+  });
+
+  it("revisar_solicitud con answer='no': no envía tieneTdr", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_solicitud",
+          answer: "no",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentTaskType: "revisar_solicitud",
+        answer: "no",
+        tieneTdr: undefined,
+      }),
+    );
+  });
+
+  it("incluye reason si viene en el form", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_tdr",
+          answer: "si",
+          reason: "motivo de prueba",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "motivo de prueba" }),
+    );
+  });
+
+  it("redirige a /casos/[id]?error=... si transitionCase falla", async () => {
+    mockTransitionCase.mockRejectedValue(new Error("boom"));
+
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "revisar_tdr",
+          answer: "si",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}?error=boom`);
+  });
+});
