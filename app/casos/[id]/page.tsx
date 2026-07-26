@@ -1,7 +1,13 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { ArrowLeft, Building, DollarSign, Tag, Zap, ShieldAlert, CheckCircle } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { TASK_ROLE, type TaskType } from "@/lib/workflow/transitions";
+import { AppLayout } from "@/components/layout/app-layout";
+import { WorkflowStepper } from "@/components/cases/workflow-stepper";
+import { TransitionTimeline, type TransitionItem } from "@/components/cases/timeline";
+import { SlaBadge } from "@/components/cases/sla-badge";
+import { TASK_ROLE, type TaskType, type CaseStage, type Role } from "@/lib/workflow/transitions";
 import { getTaskUiKind } from "@/lib/workflow/task-ui";
 import { ROLE_LABEL, TASK_LABEL } from "@/lib/workflow/labels";
 import { TASK_GATEWAY_QUESTION } from "@/lib/workflow/gateway-questions";
@@ -15,19 +21,11 @@ interface CaseRow {
   type: "servicio" | "bien";
   budget_usd: number | null;
   is_express: boolean;
-  stage: string;
+  stage: CaseStage;
   outcome: string | null;
-  current_task_type: string;
+  current_task_type: TaskType;
+  delivery_due_at: string | null;
   tume_clients: { name: string } | null;
-}
-
-interface TransitionRow {
-  id: string;
-  from_task_type: string | null;
-  to_task_type: string | null;
-  reason: string | null;
-  created_at: string;
-  tume_profiles: { full_name: string } | null;
 }
 
 export default async function CasoPage({
@@ -42,10 +40,24 @@ export default async function CasoPage({
 
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("tume_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle<{ role: Role }>();
+
   const { data: caso, error: casoError } = await supabase
     .from("tume_cases")
     .select(
-      "id, code, title, description, type, budget_usd, is_express, stage, outcome, current_task_type, tume_clients(name)",
+      "id, code, title, description, type, budget_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name)",
     )
     .eq("id", id)
     .maybeSingle<CaseRow>();
@@ -63,7 +75,7 @@ export default async function CasoPage({
     .select("id, from_task_type, to_task_type, reason, created_at, tume_profiles(full_name)")
     .eq("case_id", id)
     .order("created_at", { ascending: true })
-    .returns<TransitionRow[]>();
+    .returns<TransitionItem[]>();
 
   if (transitionsError) {
     throw new Error(
@@ -76,235 +88,291 @@ export default async function CasoPage({
   const uiKind = getTaskUiKind(currentTaskType);
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-8">
-      <div className="space-y-4 rounded-lg border bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">
-            Caso {caso.code} — {caso.title}
-          </h1>
+    <AppLayout
+      userEmail={user.email}
+      userRole={profile?.role}
+      title={`Caso ${caso.code}`}
+      description={caso.title}
+      actions={
+        <div className="flex items-center gap-3">
+          <SlaBadge deliveryDueAt={caso.delivery_due_at} stage={caso.stage} />
+          <Link
+            href="/casos"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Volver a Casos</span>
+          </Link>
+        </div>
+      }
+    >
+      {/* Visual Pipeline Stepper Component */}
+      <WorkflowStepper
+        currentStage={caso.stage}
+        currentTaskType={currentTaskType}
+        currentRole={currentRole}
+        outcome={caso.outcome}
+      />
+
+      {/* Case Details Card & Actions Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Metadata Details */}
+        <div className="lg:col-span-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+          <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
+            Información del Caso
+          </h3>
+
+          <div className="space-y-3 text-xs">
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500 flex items-center gap-1.5">
+                <Building className="size-3.5 text-slate-400" />
+                Cliente
+              </span>
+              <span className="font-semibold text-slate-900">
+                {caso.tume_clients?.name ?? "—"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500 flex items-center gap-1.5">
+                <Tag className="size-3.5 text-slate-400" />
+                Tipo de Requerimiento
+              </span>
+              <span className="font-semibold text-slate-900 capitalize">
+                {caso.type}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500 flex items-center gap-1.5">
+                <DollarSign className="size-3.5 text-slate-400" />
+                Presupuesto Estimado
+              </span>
+              <span className="font-semibold text-slate-900">
+                {caso.budget_usd != null ? `USD ${caso.budget_usd.toLocaleString()}` : "—"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500 flex items-center gap-1.5">
+                <Zap className="size-3.5 text-amber-500" />
+                Prioridad Express
+              </span>
+              <span className={`font-semibold ${caso.is_express ? "text-amber-600" : "text-slate-900"}`}>
+                {caso.is_express ? "Sí (Prioritario)" : "No"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500">Etapa del Proceso</span>
+              <span className="font-bold text-slate-900 capitalize">
+                {caso.stage}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1">
+              <span className="text-slate-500">Resultado Actual</span>
+              <span className="font-semibold text-slate-900">
+                {caso.outcome ?? "En proceso"}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-neutral-500">Tipo</dt>
-          <dd>{caso.type === "servicio" ? "Servicio" : "Bien"}</dd>
+        {/* Right Column: Next Action Decision Form */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs space-y-4">
+          <div className="border-b border-slate-100 pb-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+              Acción Pendiente
+            </span>
+            <h3 className="text-base font-bold text-slate-900">
+              Avanzar Flujo de Trabajo
+            </h3>
+          </div>
 
-          <dt className="text-neutral-500">Cliente</dt>
-          <dd>{caso.tume_clients?.name ?? "—"}</dd>
-
-          <dt className="text-neutral-500">Presupuesto</dt>
-          <dd>
-            {caso.budget_usd != null ? `USD ${caso.budget_usd}` : "—"}
-          </dd>
-
-          <dt className="text-neutral-500">Express</dt>
-          <dd>{caso.is_express ? "Sí" : "No"}</dd>
-
-          <dt className="text-neutral-500">Etapa</dt>
-          <dd>{caso.stage}</dd>
-
-          <dt className="text-neutral-500">Resultado</dt>
-          <dd>{caso.outcome ?? "En proceso"}</dd>
-
-          <dt className="text-neutral-500">Tarea actual</dt>
-          <dd>{TASK_LABEL[currentTaskType]}</dd>
-
-          <dt className="text-neutral-500">Rol asignado</dt>
-          <dd>{ROLE_LABEL[currentRole] ?? currentRole}</dd>
-        </dl>
-      </div>
-
-      <div className="space-y-3 rounded-lg border bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold">Historial de transiciones</h2>
-        {transitions && transitions.length > 0 ? (
-          <ul className="space-y-2 text-sm">
-            {transitions.map((t) => (
-              <li key={t.id} className="border-b pb-2 last:border-b-0">
-                <p>
-                  <span className="text-neutral-500">
-                    {t.from_task_type ? TASK_LABEL[t.from_task_type as TaskType] : "—"}
-                  </span>{" "}
-                  →{" "}
-                  <span className="font-medium">
-                    {t.to_task_type ? TASK_LABEL[t.to_task_type as TaskType] : "—"}
-                  </span>
-                </p>
-                <p className="text-neutral-500">
-                  {t.tume_profiles?.full_name ?? "Actor desconocido"} —{" "}
-                  {new Date(t.created_at).toLocaleString()}
-                  {t.reason ? ` — "${t.reason}"` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-neutral-500">Sin transiciones aún.</p>
-        )}
-      </div>
-
-      <div className="space-y-4 rounded-lg border bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold">Acción</h2>
-
-        {error && (
-          <p className="text-sm text-red-600" role="alert">
-            {decodeURIComponent(error)}
-          </p>
-        )}
-
-        {uiKind === "terminal" && (
-          <p className="text-sm text-neutral-500">
-            Este caso está cerrado. No hay más acciones disponibles.
-          </p>
-        )}
-
-        {uiKind === "automatic" && (
-          <form action={advanceCase} className="space-y-3">
-            <input type="hidden" name="caseId" value={caso.id} />
-            <input
-              type="hidden"
-              name="currentTaskType"
-              value={currentTaskType}
-            />
-            <div className="space-y-1">
-              <label htmlFor="reason" className="text-sm font-medium">
-                Motivo (opcional)
-              </label>
-              <textarea
-                id="reason"
-                name="reason"
-                rows={2}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
+              <ShieldAlert className="size-4 shrink-0" />
+              <span>{decodeURIComponent(error)}</span>
             </div>
-            <Button type="submit" className="w-full">
-              Continuar
-            </Button>
-          </form>
-        )}
+          )}
 
-        {uiKind === "simple-gateway" && (
-          <form action={advanceCase} className="space-y-3">
-            <input type="hidden" name="caseId" value={caso.id} />
-            <input
-              type="hidden"
-              name="currentTaskType"
-              value={currentTaskType}
-            />
-            <fieldset className="space-y-1">
-              <legend className="text-sm font-medium">
-                {TASK_GATEWAY_QUESTION[currentTaskType] ?? "Respuesta"}
-              </legend>
-              <div className="flex items-center gap-2">
-                <input
-                  id="answer-si"
-                  type="radio"
-                  name="answer"
-                  value="si"
-                  defaultChecked
-                  className="size-4"
-                />
-                <label htmlFor="answer-si" className="text-sm">
-                  Sí
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="answer-no"
-                  type="radio"
-                  name="answer"
-                  value="no"
-                  className="size-4"
-                />
-                <label htmlFor="answer-no" className="text-sm">
-                  No
-                </label>
-              </div>
-            </fieldset>
-            <div className="space-y-1">
-              <label htmlFor="reason" className="text-sm font-medium">
-                Motivo (opcional)
-              </label>
-              <textarea
-                id="reason"
-                name="reason"
-                rows={2}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
+          {uiKind === "terminal" && (
+            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <CheckCircle className="size-8 text-slate-400 mb-2" />
+              <p className="text-sm font-semibold text-slate-800">
+                Este caso ha finalizado
+              </p>
+              <p className="text-xs text-slate-500 max-w-xs mt-1">
+                El flujo de trabajo alcanzó un estado terminal ({currentTaskType}). No se requieren más acciones.
+              </p>
             </div>
-            <Button type="submit" className="w-full">
-              Confirmar
-            </Button>
-          </form>
-        )}
+          )}
 
-        {uiKind === "revisar-solicitud" && (
-          <form action={advanceCase} className="space-y-3">
-            <input type="hidden" name="caseId" value={caso.id} />
-            <input
-              type="hidden"
-              name="currentTaskType"
-              value={currentTaskType}
-            />
-            <fieldset className="space-y-1">
-              <legend className="text-sm font-medium">
-                {TASK_GATEWAY_QUESTION.revisar_solicitud}
-              </legend>
-              <div className="flex items-center gap-2">
-                <input
-                  id="answer-si"
-                  type="radio"
-                  name="answer"
-                  value="si"
-                  defaultChecked
-                  className="size-4"
-                />
-                <label htmlFor="answer-si" className="text-sm">
-                  Sí
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="answer-no"
-                  type="radio"
-                  name="answer"
-                  value="no"
-                  className="size-4"
-                />
-                <label htmlFor="answer-no" className="text-sm">
-                  No
-                </label>
-              </div>
-            </fieldset>
-
-            <div className="flex items-center gap-2 rounded-md border border-dashed p-2">
+          {uiKind === "automatic" && (
+            <form action={advanceCase} className="space-y-4">
+              <input type="hidden" name="caseId" value={caso.id} />
               <input
-                id="tieneTdr"
-                type="checkbox"
-                name="tieneTdr"
-                className="size-4 rounded border"
+                type="hidden"
+                name="currentTaskType"
+                value={currentTaskType}
               />
-              <label htmlFor="tieneTdr" className="text-sm">
-                Tiene TDR (Términos de Referencia) — solo aplica si
-                contestaste &quot;Sí&quot; arriba
-              </label>
-            </div>
+              <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-1">
+                <p className="text-xs font-semibold text-slate-700">
+                  Transición Automática
+                </p>
+                <p className="text-xs text-slate-500">
+                  Haz clic en continuar para pasar a la siguiente tarea del workflow.
+                </p>
+              </div>
 
-            <div className="space-y-1">
-              <label htmlFor="reason" className="text-sm font-medium">
-                Motivo (opcional)
-              </label>
-              <textarea
-                id="reason"
-                name="reason"
-                rows={2}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+              <div className="space-y-1.5">
+                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">
+                  Motivo / Observación (opcional)
+                </label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  placeholder="Escribe un comentario u observación para el historial..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
+                Continuar Siguiente Tarea
+              </Button>
+            </form>
+          )}
+
+          {uiKind === "simple-gateway" && (
+            <form action={advanceCase} className="space-y-4">
+              <input type="hidden" name="caseId" value={caso.id} />
+              <input
+                type="hidden"
+                name="currentTaskType"
+                value={currentTaskType}
               />
-            </div>
-            <Button type="submit" className="w-full">
-              Confirmar
-            </Button>
-          </form>
-        )}
+              <div className="rounded-xl bg-blue-50/60 p-4 border border-blue-100 space-y-3">
+                <label className="block text-xs font-bold text-slate-900">
+                  {TASK_GATEWAY_QUESTION[currentTaskType] ?? "Compuerta de decisión"}
+                </label>
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                    <input
+                      id="answer-si"
+                      type="radio"
+                      name="answer"
+                      value="si"
+                      defaultChecked
+                      className="size-4 text-blue-600 border-slate-300"
+                    />
+                    <span>Sí</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                    <input
+                      id="answer-no"
+                      type="radio"
+                      name="answer"
+                      value="no"
+                      className="size-4 text-blue-600 border-slate-300"
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">
+                  Motivo / Justificación de la Decisión
+                </label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  placeholder="Detalla el motivo de tu respuesta..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
+                Confirmar Decisión y Avanzar
+              </Button>
+            </form>
+          )}
+
+          {uiKind === "revisar-solicitud" && (
+            <form action={advanceCase} className="space-y-4">
+              <input type="hidden" name="caseId" value={caso.id} />
+              <input
+                type="hidden"
+                name="currentTaskType"
+                value={currentTaskType}
+              />
+              <div className="rounded-xl bg-blue-50/60 p-4 border border-blue-100 space-y-3">
+                <label className="block text-xs font-bold text-slate-900">
+                  {TASK_GATEWAY_QUESTION.revisar_solicitud}
+                </label>
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                    <input
+                      id="answer-si"
+                      type="radio"
+                      name="answer"
+                      value="si"
+                      defaultChecked
+                      className="size-4 text-blue-600 border-slate-300"
+                    />
+                    <span>Sí, cotizar</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                    <input
+                      id="answer-no"
+                      type="radio"
+                      name="answer"
+                      value="no"
+                      className="size-4 text-blue-600 border-slate-300"
+                    />
+                    <span>No cotizar</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 p-3 bg-slate-50">
+                <input
+                  id="tieneTdr"
+                  type="checkbox"
+                  name="tieneTdr"
+                  className="size-4 rounded border-slate-300 text-blue-600"
+                />
+                <label htmlFor="tieneTdr" className="text-xs font-medium text-slate-700 cursor-pointer">
+                  Tiene Términos de Referencia (TDR) adjuntos / definidos
+                </label>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">
+                  Motivo / Justificación
+                </label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  placeholder="Detalla las observaciones..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
+                Confirmar Revisión
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
-    </main>
+
+      {/* Transition History Timeline */}
+      <TransitionTimeline transitions={transitions} />
+    </AppLayout>
   );
 }
