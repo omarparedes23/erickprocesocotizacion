@@ -111,7 +111,36 @@ describe("findOrCreateClient", () => {
       findOrCreateClient(supabase, "Nuevo Cliente SAC"),
     ).resolves.toBe("client-new");
 
-    expect(insert).toHaveBeenCalledWith({ name: "Nuevo Cliente SAC" });
+    expect(insert).toHaveBeenCalledWith({
+      name: "Nuevo Cliente SAC",
+      ruc: null,
+    });
+  });
+
+  it("crea un cliente nuevo con ruc cuando se lo pasa explícitamente", async () => {
+    const maybeSingle = vi.fn(() =>
+      Promise.resolve({ data: null, error: null }),
+    );
+    const ilike = vi.fn(() => ({ maybeSingle }));
+    const selectFind = vi.fn(() => ({ ilike }));
+
+    const single = vi.fn(() =>
+      Promise.resolve({ data: { id: "client-new-2" }, error: null }),
+    );
+    const selectInsert = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select: selectInsert }));
+
+    mockFrom.mockReturnValue({ select: selectFind, insert });
+
+    const supabase = await createClient();
+    await expect(
+      findOrCreateClient(supabase, "Otro Cliente SAC", "20123456789"),
+    ).resolves.toBe("client-new-2");
+
+    expect(insert).toHaveBeenCalledWith({
+      name: "Otro Cliente SAC",
+      ruc: "20123456789",
+    });
   });
 
   it("propaga el error si falla la búsqueda", async () => {

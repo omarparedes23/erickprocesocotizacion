@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
 import { registerCase } from "./actions";
 
 export default async function NuevoCasoPage({
@@ -7,6 +8,13 @@ export default async function NuevoCasoPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+
+  const supabase = await createClient();
+  const { data: clients } = await supabase
+    .from("tume_clients")
+    .select("name")
+    .order("name")
+    .returns<{ name: string }[]>();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-8">
@@ -58,8 +66,13 @@ export default async function NuevoCasoPage({
             id="clientName"
             name="clientName"
             type="text"
+            list="clientes-existentes"
+            autoComplete="off"
             className="w-full rounded-md border px-3 py-2 text-sm"
           />
+          <datalist id="clientes-existentes">
+            {clients?.map((c) => <option key={c.name} value={c.name} />)}
+          </datalist>
         </div>
 
         <div className="space-y-1">

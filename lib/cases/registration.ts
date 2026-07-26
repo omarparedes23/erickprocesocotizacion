@@ -29,6 +29,7 @@ export async function generateNextCaseCode(
 export async function findOrCreateClient(
   supabase: SupabaseServerClient,
   name: string,
+  ruc?: string | null,
 ): Promise<string> {
   const { data: existing, error: findError } = await supabase
     .from("tume_clients")
@@ -46,7 +47,7 @@ export async function findOrCreateClient(
 
   const { data: created, error: insertError } = await supabase
     .from("tume_clients")
-    .insert({ name })
+    .insert({ name, ruc: ruc ?? null })
     .select("id")
     .single();
 

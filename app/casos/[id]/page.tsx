@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TASK_ROLE, type TaskType } from "@/lib/workflow/transitions";
 import { getTaskUiKind } from "@/lib/workflow/task-ui";
 import { ROLE_LABEL, TASK_LABEL } from "@/lib/workflow/labels";
+import { TASK_GATEWAY_QUESTION } from "@/lib/workflow/gateway-questions";
 import { advanceCase } from "./actions";
 
 interface CaseRow {
@@ -189,7 +190,9 @@ export default async function CasoPage({
               value={currentTaskType}
             />
             <fieldset className="space-y-1">
-              <legend className="text-sm font-medium">Respuesta</legend>
+              <legend className="text-sm font-medium">
+                {TASK_GATEWAY_QUESTION[currentTaskType] ?? "Respuesta"}
+              </legend>
               <div className="flex items-center gap-2">
                 <input
                   id="answer-si"
@@ -242,7 +245,9 @@ export default async function CasoPage({
               value={currentTaskType}
             />
             <fieldset className="space-y-1">
-              <legend className="text-sm font-medium">¿Se cotiza?</legend>
+              <legend className="text-sm font-medium">
+                {TASK_GATEWAY_QUESTION.revisar_solicitud}
+              </legend>
               <div className="flex items-center gap-2">
                 <input
                   id="answer-si"

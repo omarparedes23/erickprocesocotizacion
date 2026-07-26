@@ -94,6 +94,12 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
+            href="/clientes"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Clientes
+          </Link>
+          <Link
             href="/casos"
             className={buttonVariants({ variant: "outline" })}
           >
