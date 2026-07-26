@@ -4,30 +4,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/actions/auth";
 import { filterAndSortInbox, type InboxCaseRow } from "@/lib/cases/inbox";
+import { ROLE_LABEL, TASK_LABEL } from "@/lib/workflow/labels";
 import type { Role } from "@/lib/workflow/transitions";
-
-const TASK_LABEL: Record<string, string> = {
-  recibir_solicitud: "Recibir solicitud",
-  distribuir_solicitud: "Distribuir solicitud",
-  revisar_solicitud: "Revisar solicitud",
-  revisar_tdr: "Revisar TDR",
-  consultar_gerencia_tecnica: "Consultar gerencia técnica",
-  solicitar_informacion: "Solicitar información",
-  solicitar_visita_tecnica: "Solicitar visita técnica",
-  evaluar_gerencia_tecnica: "Evaluar gerencia técnica",
-  cotizar: "Cotizar",
-  revisar_cotizacion_lider: "Revisar cotización (líder)",
-  revisar_cotizacion_gerencia: "Revisar cotización (gerencia)",
-  enviar_cliente: "Enviar al cliente",
-  enviar_no_cotizar: "No cotizar",
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  gerente_comercial: "Gerente comercial",
-  lider_cotizador: "Líder cotizador",
-  gerente_tecnico: "Gerente técnico",
-  cotizador: "Cotizador",
-};
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -115,6 +93,12 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/casos"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Todos los casos
+          </Link>
           <Link href="/casos/nuevo" className={buttonVariants()}>
             Nuevo caso
           </Link>
