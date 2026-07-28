@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   advanceToRevisarCotizacionLider,
   answerGateway,
-  clickContinuar,
+  confirmCotizacion,
   getHistoryLines,
   goToCase,
   login,
@@ -29,10 +29,10 @@ test("revisar_cotizacion_lider rechaza y reenvía antes de aprobar", async ({
   await goToCase(page, caseId);
   await answerGateway(page, "no", "cotizar");
 
-  // 2. cotizador reenvía (continuar) -> revisar_cotizacion_lider de nuevo.
+  // 2. cotizador reenvía (monto + documento revisado) -> revisar_cotizacion_lider de nuevo.
   await switchTo(page, "cotizador");
   await goToCase(page, caseId);
-  await clickContinuar(page, "revisar_cotizacion_lider");
+  await confirmCotizacion(page, 7200, "revisar_cotizacion_lider");
 
   // 3. lider_cotizador ahora aprueba -> revisar_cotizacion_gerencia.
   await switchTo(page, "lider_cotizador");

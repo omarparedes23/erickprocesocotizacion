@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   answerGateway,
   clickContinuar,
+  confirmCotizacion,
   createCase,
   getHistoryLines,
   goToCase,
@@ -46,10 +47,10 @@ test("recorre los 4 roles hasta enviar_cliente pasando por gerencia técnica", a
   await goToCase(page, caseId);
   await answerGateway(page, "si", "cotizar");
 
-  // 6. cotizador: cotizar (continuar) -> revisar_cotizacion_lider.
+  // 6. cotizador: cotizar (monto + documento revisado) -> revisar_cotizacion_lider.
   await switchTo(page, "cotizador");
   await goToCase(page, caseId);
-  await clickContinuar(page, "revisar_cotizacion_lider");
+  await confirmCotizacion(page, 5800, "revisar_cotizacion_lider");
 
   // 7. lider_cotizador: revisar_cotizacion_lider (sí) -> revisar_cotizacion_gerencia.
   await switchTo(page, "lider_cotizador");

@@ -130,6 +130,61 @@ describe("advanceCase", () => {
     );
   });
 
+  it("cotizar: fuerza answer='si' y envía quotedAmountUsd como number", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "cotizar",
+          quotedAmountUsd: "12500.50",
+          documentReviewed: "on",
+        }),
+      ),
+    ).rejects.toThrow(`REDIRECT:/casos/${CASE_ID}`);
+
+    expect(mockTransitionCase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: CASE_ID,
+        currentTaskType: "cotizar",
+        answer: "si",
+        quotedAmountUsd: 12500.5,
+      }),
+    );
+  });
+
+  it("cotizar: redirige con error si el checkbox de documento revisado no viene marcado", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "cotizar",
+          quotedAmountUsd: "1000",
+        }),
+      ),
+    ).rejects.toThrow(
+      `REDIRECT:/casos/${CASE_ID}?error=${encodeURIComponent("Debes confirmar que revisaste el documento de la cotización")}`,
+    );
+
+    expect(mockTransitionCase).not.toHaveBeenCalled();
+  });
+
+  it("cotizar: redirige con error si el monto no es válido (vacío o <= 0)", async () => {
+    await expect(
+      advanceCase(
+        buildFormData({
+          caseId: CASE_ID,
+          currentTaskType: "cotizar",
+          quotedAmountUsd: "0",
+          documentReviewed: "on",
+        }),
+      ),
+    ).rejects.toThrow(
+      `REDIRECT:/casos/${CASE_ID}?error=${encodeURIComponent("Ingresa un monto de cotización válido")}`,
+    );
+
+    expect(mockTransitionCase).not.toHaveBeenCalled();
+  });
+
   it("incluye reason si viene en el form", async () => {
     await expect(
       advanceCase(

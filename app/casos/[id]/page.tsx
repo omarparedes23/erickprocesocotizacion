@@ -20,6 +20,7 @@ interface CaseRow {
   description: string | null;
   type: "servicio" | "bien";
   budget_usd: number | null;
+  quoted_amount_usd: number | null;
   is_express: boolean;
   stage: CaseStage;
   outcome: string | null;
@@ -57,7 +58,7 @@ export default async function CasoPage({
   const { data: caso, error: casoError } = await supabase
     .from("tume_cases")
     .select(
-      "id, code, title, description, type, budget_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name)",
+      "id, code, title, description, type, budget_usd, quoted_amount_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name)",
     )
     .eq("id", id)
     .maybeSingle<CaseRow>();
@@ -152,6 +153,18 @@ export default async function CasoPage({
                 {caso.budget_usd != null ? `USD ${caso.budget_usd.toLocaleString()}` : "—"}
               </span>
             </div>
+
+            {caso.quoted_amount_usd != null && (
+              <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <DollarSign className="size-3.5 text-slate-400" />
+                  Monto Cotizado
+                </span>
+                <span className="font-semibold text-slate-900">
+                  USD {caso.quoted_amount_usd.toLocaleString()}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
               <span className="text-slate-500 flex items-center gap-1.5">
@@ -365,6 +378,66 @@ export default async function CasoPage({
 
               <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
                 Confirmar Revisión
+              </Button>
+            </form>
+          )}
+
+          {uiKind === "cotizar" && (
+            <form action={advanceCase} className="space-y-4">
+              <input type="hidden" name="caseId" value={caso.id} />
+              <input
+                type="hidden"
+                name="currentTaskType"
+                value={currentTaskType}
+              />
+
+              <div className="space-y-1.5">
+                <label htmlFor="quotedAmountUsd" className="text-xs font-semibold text-slate-700">
+                  Monto de la Cotización (USD)
+                </label>
+                <input
+                  id="quotedAmountUsd"
+                  name="quotedAmountUsd"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  placeholder="0.00"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 p-3 bg-slate-50">
+                <input
+                  id="documentReviewed"
+                  type="checkbox"
+                  name="documentReviewed"
+                  required
+                  className="size-4 mt-0.5 rounded border-slate-300 text-blue-600"
+                />
+                <label htmlFor="documentReviewed" className="text-xs font-medium text-slate-700 cursor-pointer">
+                  Confirmo que revisé el documento de la cotización antes de continuar
+                  <span className="block text-[11px] font-normal text-slate-400 mt-0.5">
+                    La carga del documento estará disponible en una fase futura.
+                  </span>
+                </label>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">
+                  Motivo / Observación (opcional)
+                </label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  placeholder="Escribe un comentario u observación para el historial..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
+                Confirmar Cotización y Continuar
               </Button>
             </form>
           )}

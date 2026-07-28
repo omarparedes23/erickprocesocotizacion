@@ -148,12 +148,24 @@ export async function expectCurrentTask(
   );
 }
 
-/** Click en "Continuar" (tareas automáticas: recibir_solicitud, cotizar). */
+/** Click en "Continuar" (tarea automática: recibir_solicitud). */
 export async function clickContinuar(
   page: Page,
   expectedNextTask: TaskType,
 ): Promise<void> {
   await page.getByRole("button", { name: "Continuar" }).click();
+  await expectCurrentTask(page, expectedNextTask);
+}
+
+/** Completa la tarea 'cotizar': monto de la cotización + checkbox de documento revisado. */
+export async function confirmCotizacion(
+  page: Page,
+  montoUsd: number,
+  expectedNextTask: TaskType,
+): Promise<void> {
+  await page.locator("#quotedAmountUsd").fill(String(montoUsd));
+  await page.locator("#documentReviewed").check();
+  await page.getByRole("button", { name: "Confirmar Cotización" }).click();
   await expectCurrentTask(page, expectedNextTask);
 }
 
@@ -225,7 +237,7 @@ export async function advanceToRevisarTdr(
  * Camino compartido completo hasta `revisar_cotizacion_lider` (usado por
  * rejection-loop.spec.ts como precondición). Continúa desde
  * advanceToRevisarTdrInternal: revisar_tdr no (info insuficiente) ->
- * consultar_gerencia_tecnica si (aclara) -> cotizar -> continuar ->
+ * consultar_gerencia_tecnica si (aclara) -> cotizar -> confirma monto ->
  * revisar_cotizacion_lider. Termina con la sesión cerrada.
  */
 export async function advanceToRevisarCotizacionLider(
@@ -244,7 +256,7 @@ export async function advanceToRevisarCotizacionLider(
 
   await switchTo(page, "cotizador");
   await goToCase(page, caseId);
-  await clickContinuar(page, "revisar_cotizacion_lider");
+  await confirmCotizacion(page, 5500, "revisar_cotizacion_lider");
 
   await logout(page);
   return caseId;

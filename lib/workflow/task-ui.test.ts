@@ -10,11 +10,14 @@ describe("getTaskUiKind", () => {
 
   it("clasifica las tareas automáticas (un solo botón 'Continuar')", () => {
     expect(getTaskUiKind("recibir_solicitud")).toBe("automatic");
-    expect(getTaskUiKind("cotizar")).toBe("automatic");
   });
 
   it("clasifica revisar_solicitud como caso especial de dos preguntas", () => {
     expect(getTaskUiKind("revisar_solicitud")).toBe("revisar-solicitud");
+  });
+
+  it("clasifica cotizar como caso especial (monto + documento revisado)", () => {
+    expect(getTaskUiKind("cotizar")).toBe("cotizar");
   });
 
   it("clasifica el resto como gateway simple sí/no", () => {
@@ -56,6 +59,7 @@ describe("getTaskUiKind", () => {
       "automatic",
       "simple-gateway",
       "revisar-solicitud",
+      "cotizar",
     ];
 
     expect(allTasks).toHaveLength(13);

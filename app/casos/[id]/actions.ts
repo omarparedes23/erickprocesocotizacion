@@ -13,10 +13,11 @@ export async function advanceCase(formData: FormData) {
 
   const uiKind = getTaskUiKind(currentTaskType);
 
-  // Las tareas automáticas no tienen campo "answer" en el form: el valor es
-  // dummy, `getNextTask` lo ignora internamente para estas tareas.
+  // Las tareas automáticas (y "cotizar", que se comporta igual) no tienen
+  // campo "answer" en el form: el valor es dummy, `getNextTask` lo ignora
+  // internamente para estas tareas.
   const answer: GatewayAnswer =
-    uiKind === "automatic"
+    uiKind === "automatic" || uiKind === "cotizar"
       ? "si"
       : ((formData.get("answer") as GatewayAnswer) ?? "si");
 
@@ -27,8 +28,36 @@ export async function advanceCase(formData: FormData) {
       ? formData.get("tieneTdr") === "on"
       : undefined;
 
+  // "cotizar" exige monto > 0 y la confirmación de que se revisó el
+  // documento antes de avanzar a revisar_cotizacion_lider. La carga del
+  // documento en sí queda para una fase futura.
+  let quotedAmountUsd: number | undefined;
+  if (uiKind === "cotizar") {
+    const documentReviewed = formData.get("documentReviewed") === "on";
+    if (!documentReviewed) {
+      redirect(
+        `/casos/${caseId}?error=${encodeURIComponent("Debes confirmar que revisaste el documento de la cotización")}`,
+      );
+    }
+
+    const rawAmount = formData.get("quotedAmountUsd") as string | null;
+    quotedAmountUsd = rawAmount ? Number(rawAmount) : NaN;
+    if (!Number.isFinite(quotedAmountUsd) || quotedAmountUsd <= 0) {
+      redirect(
+        `/casos/${caseId}?error=${encodeURIComponent("Ingresa un monto de cotización válido")}`,
+      );
+    }
+  }
+
   try {
-    await transitionCase({ caseId, currentTaskType, answer, tieneTdr, reason });
+    await transitionCase({
+      caseId,
+      currentTaskType,
+      answer,
+      tieneTdr,
+      quotedAmountUsd,
+      reason,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
     redirect(`/casos/${caseId}?error=${encodeURIComponent(message)}`);

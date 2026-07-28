@@ -71,6 +71,7 @@ const TransitionCaseInput = z.object({
   currentTaskType: z.string(),
   answer: z.enum(["si", "no"]),
   tieneTdr: z.boolean().optional(),
+  quotedAmountUsd: z.number().positive().optional(),
   reason: z.string().optional(),
 });
 
@@ -105,6 +106,7 @@ export async function transitionCase(
     p_next_outcome: nextOutcome,
     p_actor_id: user.id,
     p_reason: parsed.reason ?? null,
+    p_quoted_amount_usd: parsed.quotedAmountUsd ?? null,
   });
 
   if (error) {
