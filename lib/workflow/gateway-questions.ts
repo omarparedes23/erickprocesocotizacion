@@ -19,6 +19,7 @@ export const TASK_GATEWAY_QUESTION: Partial<Record<TaskType, string>> = {
     "¿Con la visita técnica ya hay información suficiente para cotizar?",
   evaluar_gerencia_tecnica:
     "¿Gerencia Técnica confirma que hay información suficiente para cotizar?",
-  revisar_cotizacion_lider: "¿Se aprueba?",
-  revisar_cotizacion_gerencia: "¿Se aprueba?",
+  revisar_cotizacion_lider: "¿El Líder Cotizador aprueba la cotización?",
+  revisar_cotizacion_gerencia:
+    "¿Gerencia Comercial aprueba la cotización para enviarla al cliente?",
 };

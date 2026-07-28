@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getTaskUiKind, type TaskUiKind } from "./task-ui";
+import { getTaskUiKind, isFinalTask, type TaskUiKind } from "./task-ui";
 import type { TaskType } from "./transitions";
 
 describe("getTaskUiKind", () => {
-  it("clasifica las tareas terminales (caso cerrado, sin acciones)", () => {
-    expect(getTaskUiKind("enviar_cliente")).toBe("terminal");
-    expect(getTaskUiKind("enviar_no_cotizar")).toBe("terminal");
+  it("clasifica las tareas finales (envío confirmable por checkbox, sin tarea siguiente)", () => {
+    expect(getTaskUiKind("enviar_cliente")).toBe("final-confirm");
+    expect(getTaskUiKind("enviar_no_cotizar")).toBe("final-confirm");
   });
 
   it("clasifica las tareas automáticas (un solo botón 'Continuar')", () => {
@@ -55,16 +55,26 @@ describe("getTaskUiKind", () => {
     ];
 
     const validKinds: TaskUiKind[] = [
-      "terminal",
       "automatic",
       "simple-gateway",
       "revisar-solicitud",
       "cotizar",
+      "final-confirm",
     ];
 
     expect(allTasks).toHaveLength(13);
     for (const task of allTasks) {
       expect(validKinds).toContain(getTaskUiKind(task));
     }
+  });
+});
+
+describe("isFinalTask", () => {
+  it("es true solo para enviar_cliente y enviar_no_cotizar", () => {
+    expect(isFinalTask("enviar_cliente")).toBe(true);
+    expect(isFinalTask("enviar_no_cotizar")).toBe(true);
+    expect(isFinalTask("cotizar")).toBe(false);
+    expect(isFinalTask("recibir_solicitud")).toBe(false);
+    expect(isFinalTask("revisar_cotizacion_gerencia")).toBe(false);
   });
 });

@@ -169,6 +169,18 @@ export async function confirmCotizacion(
   await expectCurrentTask(page, expectedNextTask);
 }
 
+/**
+ * Confirma la tarea final (enviar_cliente / enviar_no_cotizar): checkbox de
+ * envío + submit. `current_task_type` no cambia (no hay tarea siguiente en
+ * el diagrama), así que en vez de `expectCurrentTask` esperamos a que el
+ * panel de acción muestre el estado realmente cerrado.
+ */
+export async function confirmFinalSend(page: Page): Promise<void> {
+  await page.locator("#confirmSent").check();
+  await page.getByRole("button", { name: "Confirmar Envío" }).click();
+  await expect(page.getByText("Este caso ha finalizado")).toBeVisible();
+}
+
 /** Responde un gateway simple o revisar_solicitud (radios sí/no + tieneTdr opcional) y confirma. */
 export async function answerGateway(
   page: Page,

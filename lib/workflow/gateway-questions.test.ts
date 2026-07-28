@@ -21,9 +21,17 @@ describe("TASK_GATEWAY_QUESTION", () => {
     expect(TASK_GATEWAY_QUESTION.evaluar_gerencia_tecnica).toBe(
       "¿Gerencia Técnica confirma que hay información suficiente para cotizar?",
     );
-    expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_lider).toBe("¿Se aprueba?");
+    expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_lider).toBe(
+      "¿El Líder Cotizador aprueba la cotización?",
+    );
     expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_gerencia).toBe(
-      "¿Se aprueba?",
+      "¿Gerencia Comercial aprueba la cotización para enviarla al cliente?",
+    );
+  });
+
+  it("las dos preguntas de aprobación de cotización son distintas entre sí (líder vs. gerencia)", () => {
+    expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_lider).not.toBe(
+      TASK_GATEWAY_QUESTION.revisar_cotizacion_gerencia,
     );
   });
 
