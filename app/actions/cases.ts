@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canCreateCase } from "@/lib/permissions";
 import {
   computeIsExpress,
   getNextTask,
@@ -10,6 +11,7 @@ import {
   getStageForTask,
   TASK_ROLE,
   type GatewayAnswer,
+  type Role,
   type TaskType,
 } from "@/lib/workflow/transitions";
 
@@ -33,6 +35,16 @@ export async function createCase(input: z.infer<typeof CreateCaseInput>) {
   } = await supabase.auth.getUser();
   if (!user) {
     throw new Error("No autenticado");
+  }
+
+  const { data: profile } = await supabase
+    .from("tume_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle<{ role: Role }>();
+
+  if (!canCreateCase(profile?.role)) {
+    throw new Error("Tu rol no tiene permiso para registrar casos nuevos");
   }
 
   const isExpress = computeIsExpress(

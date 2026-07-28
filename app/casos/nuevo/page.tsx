@@ -4,6 +4,7 @@ import { ArrowLeft, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { AppLayout } from "@/components/layout/app-layout";
+import { canCreateCase } from "@/lib/permissions";
 import { registerCase } from "./actions";
 import type { Role } from "@/lib/workflow/transitions";
 
@@ -29,6 +30,10 @@ export default async function NuevoCasoPage({
     .select("role")
     .eq("id", user.id)
     .maybeSingle<{ role: Role }>();
+
+  if (!canCreateCase(profile?.role)) {
+    redirect("/dashboard");
+  }
 
   const { data: clients } = await supabase
     .from("tume_clients")

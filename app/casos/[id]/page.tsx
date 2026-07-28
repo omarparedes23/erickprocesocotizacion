@@ -27,6 +27,7 @@ interface CaseRow {
   current_task_type: TaskType;
   delivery_due_at: string | null;
   tume_clients: { name: string } | null;
+  tume_profiles: { full_name: string } | null;
 }
 
 export default async function CasoPage({
@@ -58,7 +59,7 @@ export default async function CasoPage({
   const { data: caso, error: casoError } = await supabase
     .from("tume_cases")
     .select(
-      "id, code, title, description, type, budget_usd, quoted_amount_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name)",
+      "id, code, title, description, type, budget_usd, quoted_amount_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name), tume_profiles!tume_cases_created_by_fkey(full_name)",
     )
     .eq("id", id)
     .maybeSingle<CaseRow>();
@@ -198,6 +199,16 @@ export default async function CasoPage({
               <span className="text-slate-500">Etapa del Proceso</span>
               <span className="font-bold text-slate-900 capitalize">
                 {caso.stage}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 border-b border-slate-100/60">
+              <span className="text-slate-500 flex items-center gap-1.5">
+                <User className="size-3.5 text-slate-400" />
+                Registrado por
+              </span>
+              <span className="font-semibold text-slate-900">
+                {caso.tume_profiles?.full_name ?? "—"}
               </span>
             </div>
 

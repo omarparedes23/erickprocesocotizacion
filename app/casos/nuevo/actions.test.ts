@@ -195,6 +195,17 @@ describe("registerCase", () => {
     return fd;
   }
 
+  /** .from("tume_profiles").select().eq().maybeSingle() -> rol con permiso de creación. */
+  function mockProfileTable() {
+    return {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve({ data: { role: "gerente_comercial" }, error: null }),
+      ),
+    };
+  }
+
   function mockFromForNewClient(clientId: string) {
     mockFrom.mockImplementation((table: string) => {
       if (table === "tume_cases") {
@@ -214,6 +225,9 @@ describe("registerCase", () => {
         const selectInsert = vi.fn(() => ({ single }));
         const insert = vi.fn(() => ({ select: selectInsert }));
         return { select: selectFind, insert };
+      }
+      if (table === "tume_profiles") {
+        return mockProfileTable();
       }
       throw new Error(`tabla inesperada: ${table}`);
     });
@@ -256,6 +270,9 @@ describe("registerCase", () => {
         return {
           select: vi.fn(() => Promise.resolve({ count: 0, error: null })),
         };
+      }
+      if (table === "tume_profiles") {
+        return mockProfileTable();
       }
       throw new Error(`tabla inesperada: ${table}`);
     });

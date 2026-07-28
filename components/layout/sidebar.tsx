@@ -11,6 +11,7 @@ import {
   Building2,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
+import { canCreateCase } from "@/lib/permissions";
 import { ROLE_LABEL } from "@/lib/workflow/labels";
 import type { Role } from "@/lib/workflow/transitions";
 
@@ -59,16 +60,18 @@ export function Sidebar({ userEmail, userRole }: SidebarProps) {
         </Link>
       </div>
 
-      {/* CTA Button */}
-      <div className="p-4">
-        <Link
-          href="/casos/nuevo"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.99]"
-        >
-          <PlusCircle className="size-4" />
-          <span>Nuevo Caso</span>
-        </Link>
-      </div>
+      {/* CTA Button — solo roles que pueden registrar casos (ver lib/permissions.ts) */}
+      {canCreateCase(userRole) && (
+        <div className="p-4">
+          <Link
+            href="/casos/nuevo"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.99]"
+          >
+            <PlusCircle className="size-4" />
+            <span>Nuevo Caso</span>
+          </Link>
+        </div>
+      )}
 
       {/* Main Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-2">

@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetUser = vi.fn();
 const mockRpc = vi.fn();
+const mockFrom = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockGetUser },
     rpc: mockRpc,
+    from: mockFrom,
   })),
 }));
 
@@ -24,11 +26,27 @@ const { createCase, transitionCase, completeFinalTask } = await import(
 
 const FAKE_USER = { id: "11111111-1111-1111-1111-111111111111" };
 
+/** Encadenable falso de .from("tume_profiles").select().eq().maybeSingle(). */
+function mockProfileQuery(role: string | null) {
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi
+      .fn()
+      .mockResolvedValue({ data: role ? { role } : null, error: null }),
+  };
+}
+
 beforeEach(() => {
   mockGetUser.mockReset();
   mockRpc.mockReset();
+  mockFrom.mockReset();
   mockGetUser.mockResolvedValue({ data: { user: FAKE_USER } });
   mockRpc.mockResolvedValue({ data: { id: "case-1" }, error: null });
+  // Rol con permiso de creación por defecto: los tests de transitionCase/
+  // completeFinalTask no llaman a .from(), así que esto solo afecta a
+  // createCase(). Los tests de rechazo por rol lo pisan explícitamente.
+  mockFrom.mockReturnValue(mockProfileQuery("gerente_comercial"));
 });
 
 describe("createCase", () => {
@@ -77,6 +95,34 @@ describe("createCase", () => {
     await expect(createCase(validInput)).rejects.toThrow(
       "No se pudo crear el caso: boom",
     );
+  });
+
+  it("permite crear casos a lider_cotizador", async () => {
+    mockFrom.mockReturnValue(mockProfileQuery("lider_cotizador"));
+    await createCase(validInput);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "tume_create_case",
+      expect.objectContaining({ p_actor_id: FAKE_USER.id }),
+    );
+  });
+
+  it("rechaza crear casos a gerente_tecnico y cotizador", async () => {
+    for (const role of ["gerente_tecnico", "cotizador"]) {
+      mockRpc.mockClear();
+      mockFrom.mockReturnValue(mockProfileQuery(role));
+      await expect(createCase(validInput)).rejects.toThrow(
+        "Tu rol no tiene permiso para registrar casos nuevos",
+      );
+      expect(mockRpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rechaza crear casos si el perfil no existe", async () => {
+    mockFrom.mockReturnValue(mockProfileQuery(null));
+    await expect(createCase(validInput)).rejects.toThrow(
+      "Tu rol no tiene permiso para registrar casos nuevos",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
 
