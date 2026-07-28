@@ -9,6 +9,8 @@ interface WorkflowStepperProps {
   currentTaskType: TaskType;
   currentRole: Role;
   outcome?: string | null;
+  /** ¿gerente_comercial ya confirmó el envío (enviar_cliente/enviar_no_cotizar)? */
+  isFinalConfirmed?: boolean;
 }
 
 const STAGES: Array<{
@@ -50,10 +52,17 @@ export function WorkflowStepper({
   currentTaskType,
   currentRole,
   outcome,
+  isFinalConfirmed = false,
 }: WorkflowStepperProps) {
   const currentIndex = STAGE_INDEX[currentStage] ?? 0;
-  const isTerminalNoCotizar = currentTaskType === "enviar_no_cotizar";
-  const isTerminalCliente = currentTaskType === "enviar_cliente";
+  const isTerminalNoCotizar =
+    currentTaskType === "enviar_no_cotizar" && isFinalConfirmed;
+  const isTerminalCliente =
+    currentTaskType === "enviar_cliente" && isFinalConfirmed;
+  const isPendingFinalConfirm =
+    (currentTaskType === "enviar_cliente" ||
+      currentTaskType === "enviar_no_cotizar") &&
+    !isFinalConfirmed;
 
   return (
     <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
@@ -78,6 +87,11 @@ export function WorkflowStepper({
               <Check className="size-3.5" />
               Enviado al Cliente
             </span>
+          ) : isPendingFinalConfirm ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              <Clock className="size-3.5 animate-pulse" />
+              Pendiente de Confirmar Envío
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
               <Clock className="size-3.5 animate-pulse" />
@@ -99,8 +113,12 @@ export function WorkflowStepper({
         />
 
         {STAGES.map((stage, idx) => {
-          const isDone = idx < currentIndex || (currentStage === "cerrado" && idx === 3);
-          const isCurrent = idx === currentIndex && currentStage !== "cerrado";
+          const isDone =
+            idx < currentIndex ||
+            (currentStage === "cerrado" && idx === 3 && isFinalConfirmed);
+          const isCurrent =
+            (idx === currentIndex && currentStage !== "cerrado") ||
+            (currentStage === "cerrado" && idx === 3 && !isFinalConfirmed);
 
           return (
             <div

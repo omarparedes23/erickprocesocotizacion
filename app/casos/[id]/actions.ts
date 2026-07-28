@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { transitionCase } from "@/app/actions/cases";
+import { completeFinalTask, transitionCase } from "@/app/actions/cases";
 import { getTaskUiKind } from "@/lib/workflow/task-ui";
 import type { GatewayAnswer, TaskType } from "@/lib/workflow/transitions";
 
@@ -12,6 +12,27 @@ export async function advanceCase(formData: FormData) {
   const reason = reasonRaw || undefined;
 
   const uiKind = getTaskUiKind(currentTaskType);
+
+  // enviar_cliente / enviar_no_cotizar no generan tarea siguiente (el
+  // diagrama termina en el evento Fin): no pasan por transitionCase/
+  // getNextTask, solo confirman la tarea actual como hecha.
+  if (uiKind === "final-confirm") {
+    const confirmed = formData.get("confirmSent") === "on";
+    if (!confirmed) {
+      redirect(
+        `/casos/${caseId}?error=${encodeURIComponent("Debes confirmar el envío antes de cerrar el caso")}`,
+      );
+    }
+
+    try {
+      await completeFinalTask({ caseId, currentTaskType, reason });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      redirect(`/casos/${caseId}?error=${encodeURIComponent(message)}`);
+    }
+
+    redirect(`/casos/${caseId}`);
+  }
 
   // Las tareas automáticas (y "cotizar", que se comporta igual) no tienen
   // campo "answer" en el form: el valor es dummy, `getNextTask` lo ignora

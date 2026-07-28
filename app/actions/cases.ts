@@ -123,3 +123,52 @@ export async function transitionCase(
 
   return data;
 }
+
+// Texto por defecto cuando el usuario deja el motivo en blanco al confirmar
+// una tarea final: sin esto, la fila del historial (self-transition, ver
+// tume_complete_final_task) queda sin ningún comentario que explique qué
+// pasó. Vive acá, no en SQL, por la misma razón que 0002_transition_functions
+// documenta: nada de lenguaje de negocio en la capa de datos.
+const FINAL_TASK_DEFAULT_REASON: Partial<Record<TaskType, string>> = {
+  enviar_cliente: "Cotización enviada al cliente.",
+  enviar_no_cotizar: "Correo de no cotización enviado al cliente.",
+};
+
+const CompleteFinalTaskInput = z.object({
+  caseId: z.uuid(),
+  currentTaskType: z.string(),
+  reason: z.string().optional(),
+});
+
+export async function completeFinalTask(
+  input: z.infer<typeof CompleteFinalTaskInput>,
+) {
+  const parsed = CompleteFinalTaskInput.parse(input);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("No autenticado");
+  }
+
+  const currentTaskType = parsed.currentTaskType as TaskType;
+  const reason =
+    parsed.reason ?? FINAL_TASK_DEFAULT_REASON[currentTaskType] ?? null;
+
+  const { data, error } = await supabase.rpc("tume_complete_final_task", {
+    p_case_id: parsed.caseId,
+    p_actor_id: user.id,
+    p_reason: reason,
+  });
+
+  if (error) {
+    throw new Error(`No se pudo confirmar el envío: ${error.message}`);
+  }
+
+  revalidatePath(`/casos/${parsed.caseId}`);
+  revalidatePath("/dashboard");
+
+  return data;
+}

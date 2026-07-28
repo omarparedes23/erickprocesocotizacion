@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Building, DollarSign, Tag, Zap, ShieldAlert, CheckCircle } from "lucide-react";
+import { ArrowLeft, Building, DollarSign, Tag, Zap, ShieldAlert, CheckCircle, User } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +8,7 @@ import { WorkflowStepper } from "@/components/cases/workflow-stepper";
 import { TransitionTimeline, type TransitionItem } from "@/components/cases/timeline";
 import { SlaBadge } from "@/components/cases/sla-badge";
 import { TASK_ROLE, type TaskType, type CaseStage, type Role } from "@/lib/workflow/transitions";
-import { getTaskUiKind } from "@/lib/workflow/task-ui";
+import { getTaskUiKind, isFinalTask } from "@/lib/workflow/task-ui";
 import { ROLE_LABEL, TASK_LABEL } from "@/lib/workflow/labels";
 import { TASK_GATEWAY_QUESTION } from "@/lib/workflow/gateway-questions";
 import { advanceCase } from "./actions";
@@ -88,6 +88,23 @@ export default async function CasoPage({
   const currentRole = TASK_ROLE[currentTaskType];
   const uiKind = getTaskUiKind(currentTaskType);
 
+  // enviar_cliente/enviar_no_cotizar se quedan como current_task_type incluso
+  // después de confirmados (no generan tarea siguiente): hay que mirar el
+  // status de la fila en tume_tasks para saber si el envío ya se confirmó o
+  // sigue pendiente de que gerente_comercial haga el check.
+  let isFinalConfirmed = false;
+  if (isFinalTask(currentTaskType)) {
+    const { data: currentTaskRow } = await supabase
+      .from("tume_tasks")
+      .select("status")
+      .eq("case_id", id)
+      .eq("task_type", currentTaskType)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ status: string }>();
+    isFinalConfirmed = currentTaskRow?.status === "done";
+  }
+
   return (
     <AppLayout
       userEmail={user.email}
@@ -113,6 +130,7 @@ export default async function CasoPage({
         currentTaskType={currentTaskType}
         currentRole={currentRole}
         outcome={caso.outcome}
+        isFinalConfirmed={isFinalConfirmed}
       />
 
       {/* Case Details Card & Actions Grid */}
@@ -210,7 +228,7 @@ export default async function CasoPage({
             </div>
           )}
 
-          {uiKind === "terminal" && (
+          {isFinalConfirmed && (
             <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
               <CheckCircle className="size-8 text-slate-400 mb-2" />
               <p className="text-sm font-semibold text-slate-800">
@@ -220,6 +238,56 @@ export default async function CasoPage({
                 El flujo de trabajo alcanzó un estado terminal ({currentTaskType}). No se requieren más acciones.
               </p>
             </div>
+          )}
+
+          {!isFinalConfirmed && uiKind === "final-confirm" && (
+            <form action={advanceCase} className="space-y-4">
+              <input type="hidden" name="caseId" value={caso.id} />
+              <input
+                type="hidden"
+                name="currentTaskType"
+                value={currentTaskType}
+              />
+
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                <User className="size-3.5 shrink-0" />
+                Decisión de: {ROLE_LABEL[TASK_ROLE[currentTaskType]]}
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 p-3 bg-slate-50">
+                <input
+                  id="confirmSent"
+                  type="checkbox"
+                  name="confirmSent"
+                  required
+                  className="size-4 mt-0.5 rounded border-slate-300 text-blue-600"
+                />
+                <label htmlFor="confirmSent" className="text-xs font-medium text-slate-700 cursor-pointer">
+                  {currentTaskType === "enviar_cliente"
+                    ? "Confirmo que envié la cotización al cliente"
+                    : "Confirmo que envié el correo de no cotización al cliente"}
+                </label>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">
+                  Motivo / Observación (opcional)
+                </label>
+                <textarea
+                  id="reason"
+                  name="reason"
+                  rows={2}
+                  placeholder="Escribe un comentario u observación para el historial..."
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 font-semibold text-xs py-2.5">
+                {currentTaskType === "enviar_cliente"
+                  ? "Confirmar Envío y Cerrar Caso"
+                  : "Confirmar Envío de No Cotización"}
+              </Button>
+            </form>
           )}
 
           {uiKind === "automatic" && (
@@ -267,6 +335,10 @@ export default async function CasoPage({
                 value={currentTaskType}
               />
               <div className="rounded-xl bg-blue-50/60 p-4 border border-blue-100 space-y-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                  <User className="size-3.5 shrink-0" />
+                  Decisión de: {ROLE_LABEL[TASK_ROLE[currentTaskType]]}
+                </div>
                 <label className="block text-xs font-bold text-slate-900">
                   {TASK_GATEWAY_QUESTION[currentTaskType] ?? "Compuerta de decisión"}
                 </label>
@@ -323,6 +395,10 @@ export default async function CasoPage({
                 value={currentTaskType}
               />
               <div className="rounded-xl bg-blue-50/60 p-4 border border-blue-100 space-y-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                  <User className="size-3.5 shrink-0" />
+                  Decisión de: {ROLE_LABEL[TASK_ROLE.revisar_solicitud]}
+                </div>
                 <label className="block text-xs font-bold text-slate-900">
                   {TASK_GATEWAY_QUESTION.revisar_solicitud}
                 </label>
@@ -390,6 +466,11 @@ export default async function CasoPage({
                 name="currentTaskType"
                 value={currentTaskType}
               />
+
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                <User className="size-3.5 shrink-0" />
+                Decisión de: {ROLE_LABEL[TASK_ROLE.cotizar]}
+              </div>
 
               <div className="space-y-1.5">
                 <label htmlFor="quotedAmountUsd" className="text-xs font-semibold text-slate-700">

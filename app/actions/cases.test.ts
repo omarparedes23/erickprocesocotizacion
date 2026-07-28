@@ -18,7 +18,9 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-const { createCase, transitionCase } = await import("./cases");
+const { createCase, transitionCase, completeFinalTask } = await import(
+  "./cases"
+);
 
 const FAKE_USER = { id: "11111111-1111-1111-1111-111111111111" };
 
@@ -121,6 +123,60 @@ describe("transitionCase", () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: "boom" } });
     await expect(transitionCase(baseInput)).rejects.toThrow(
       "No se pudo transicionar el caso: boom",
+    );
+  });
+});
+
+describe("completeFinalTask", () => {
+  const baseInput = {
+    caseId: "22222222-2222-4222-8222-222222222222",
+    currentTaskType: "enviar_cliente",
+  };
+
+  it("rechaza si no hay usuario autenticado", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    await expect(completeFinalTask(baseInput)).rejects.toThrow(
+      "No autenticado",
+    );
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("llama al RPC con el reason recibido", async () => {
+    await completeFinalTask({ ...baseInput, reason: "Enviado por correo" });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "tume_complete_final_task",
+      expect.objectContaining({
+        p_case_id: baseInput.caseId,
+        p_actor_id: FAKE_USER.id,
+        p_reason: "Enviado por correo",
+      }),
+    );
+  });
+
+  it("usa un motivo por defecto específico de la tarea si no viene reason", async () => {
+    await completeFinalTask(baseInput);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "tume_complete_final_task",
+      expect.objectContaining({ p_reason: "Cotización enviada al cliente." }),
+    );
+
+    mockRpc.mockClear();
+    await completeFinalTask({
+      ...baseInput,
+      currentTaskType: "enviar_no_cotizar",
+    });
+    expect(mockRpc).toHaveBeenCalledWith(
+      "tume_complete_final_task",
+      expect.objectContaining({
+        p_reason: "Correo de no cotización enviado al cliente.",
+      }),
+    );
+  });
+
+  it("propaga el error de Supabase si el RPC falla", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+    await expect(completeFinalTask(baseInput)).rejects.toThrow(
+      "No se pudo confirmar el envío: boom",
     );
   });
 });

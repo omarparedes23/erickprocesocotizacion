@@ -3,6 +3,7 @@ import {
   answerGateway,
   clickContinuar,
   confirmCotizacion,
+  confirmFinalSend,
   createCase,
   getHistoryLines,
   goToCase,
@@ -57,22 +58,20 @@ test("recorre los 4 roles hasta enviar_cliente pasando por gerencia técnica", a
   await goToCase(page, caseId);
   await answerGateway(page, "si", "revisar_cotizacion_gerencia");
 
-  // 8. gerente_comercial: revisar_cotizacion_gerencia (sí) -> enviar_cliente (terminal).
+  // 8. gerente_comercial: revisar_cotizacion_gerencia (sí) -> enviar_cliente
+  // (pendiente de confirmar: no es terminal hasta que se confirma el envío).
   await switchTo(page, "gerente_comercial");
   await goToCase(page, caseId);
   await answerGateway(page, "si", "enviar_cliente");
 
-  await expect(
-    page.getByText(
-      "Este caso está cerrado. No hay más acciones disponibles.",
-    ),
-  ).toBeVisible();
+  // 9. gerente_comercial confirma el envío -> recién ahí el caso queda cerrado.
+  await confirmFinalSend(page);
 
-  // El historial tiene 9 filas: 1 por la creación del caso ("— → Recibir
+  // El historial tiene 10 filas: 1 por la creación del caso ("— → Recibir
   // solicitud", insertada por tume_create_case) + 8 por cada transición de
-  // la máquina de estados que efectivamente recorrimos en los pasos 2-8
-  // (ver supabase/migrations/0001_init.sql: tume_apply_transition inserta
-  // una fila por llamada).
+  // la máquina de estados que recorrimos en los pasos 2-8 + 1 por la
+  // confirmación de envío del paso 9 (self-transition, ver
+  // tume_complete_final_task en supabase/migrations/0006_final_task_confirmation.sql).
   const lines = await getHistoryLines(page);
-  expect(lines).toHaveLength(9);
+  expect(lines).toHaveLength(10);
 });

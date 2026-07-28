@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   clickContinuar,
+  confirmFinalSend,
   createCase,
   login,
   uniqueClientName,
@@ -19,8 +20,10 @@ test("el listado /casos muestra casos abiertos y cerrados, navegables desde el d
     budgetUsd: 8000,
   });
 
-  // distribuir_solicitud -> "no" cierra el caso de una (enviar_no_cotizar,
-  // stage=cerrado) — el camino más corto a un caso terminal para este test.
+  // distribuir_solicitud -> "no" manda el caso a enviar_no_cotizar
+  // (stage=cerrado ya queda seteado) — el camino más corto a un caso
+  // terminal para este test. Sigue siendo gerente_comercial quien confirma
+  // el envío, así que no hace falta cambiar de sesión.
   const closedTitle = uniqueTitle("Listado-Cerrado");
   await createCase(page, {
     title: closedTitle,
@@ -33,6 +36,7 @@ test("el listado /casos muestra casos abiertos y cerrados, navegables desde el d
   await expect(page.locator("dt:has-text('Tarea actual') + dd")).toHaveText(
     "No cotizar",
   );
+  await confirmFinalSend(page);
 
   // Navegación: dashboard -> "Todos los casos" -> /casos
   await page.goto("/dashboard");
@@ -47,12 +51,10 @@ test("el listado /casos muestra casos abiertos y cerrados, navegables desde el d
   await expect(closedLink).toContainText("cerrado");
 
   // Click en la fila del caso cerrado navega al detalle correcto y lo muestra
-  // sin acciones disponibles (uiKind === "terminal").
+  // sin acciones disponibles (envío ya confirmado, ver confirmFinalSend arriba).
   await closedLink.click();
   await expect(
     page.getByRole("heading", { name: closedTitle }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Este caso está cerrado. No hay más acciones disponibles."),
-  ).toBeVisible();
+  await expect(page.getByText("Este caso ha finalizado")).toBeVisible();
 });
