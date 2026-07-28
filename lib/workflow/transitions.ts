@@ -95,7 +95,7 @@ export function getNextTask(
         "revisar_solicitud con answer='si' requiere ctx.tieneTdr",
       );
     }
-    return ctx.tieneTdr ? "revisar_tdr" : "enviar_no_cotizar";
+    return ctx.tieneTdr ? "revisar_tdr" : "consultar_gerencia_tecnica";
   }
 
   const simple = SIMPLE_GATEWAY_TRANSITIONS[current];

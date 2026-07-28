@@ -45,10 +45,10 @@ describe("getNextTask", () => {
       ).toBe("revisar_tdr");
     });
 
-    it("se cotiza pero no tiene TDR -> enviar_no_cotizar", () => {
+    it("se cotiza pero no tiene TDR -> consultar_gerencia_tecnica", () => {
       expect(
         getNextTask("revisar_solicitud", "si", { tieneTdr: false }),
-      ).toBe("enviar_no_cotizar");
+      ).toBe("consultar_gerencia_tecnica");
     });
 
     it("se cotiza sin especificar tieneTdr lanza error (falta info obligatoria)", () => {

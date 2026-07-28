@@ -7,19 +7,19 @@ describe("TASK_GATEWAY_QUESTION", () => {
       "¿Es una especialidad que cotizamos (eléctrica o instrumentación)?",
     );
     expect(TASK_GATEWAY_QUESTION.revisar_tdr).toBe(
-      "¿Suficiente información para cotizar?",
+      "¿El TDR tiene información suficiente para cotizar?",
     );
     expect(TASK_GATEWAY_QUESTION.consultar_gerencia_tecnica).toBe(
-      "¿Aclara consultas?",
+      "¿La consulta con Gerencia Técnica aclaró las dudas?",
     );
     expect(TASK_GATEWAY_QUESTION.solicitar_informacion).toBe(
-      "¿Suficiente información?",
+      "¿La información solicitada al cliente es suficiente para cotizar?",
     );
     expect(TASK_GATEWAY_QUESTION.solicitar_visita_tecnica).toBe(
-      "¿Suficiente información?",
+      "¿Con la visita técnica ya hay información suficiente para cotizar?",
     );
     expect(TASK_GATEWAY_QUESTION.evaluar_gerencia_tecnica).toBe(
-      "¿Suficiente información?",
+      "¿Gerencia Técnica confirma que hay información suficiente para cotizar?",
     );
     expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_lider).toBe("¿Se aprueba?");
     expect(TASK_GATEWAY_QUESTION.revisar_cotizacion_gerencia).toBe(
