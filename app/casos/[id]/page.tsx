@@ -8,7 +8,7 @@ import { WorkflowStepper } from "@/components/cases/workflow-stepper";
 import { TransitionTimeline, type TransitionItem } from "@/components/cases/timeline";
 import { SlaBadge } from "@/components/cases/sla-badge";
 import { TASK_ROLE, type TaskType, type CaseStage, type Role } from "@/lib/workflow/transitions";
-import { getTaskUiKind, isFinalTask } from "@/lib/workflow/task-ui";
+import { getTaskUiKind } from "@/lib/workflow/task-ui";
 import { ROLE_LABEL, TASK_LABEL } from "@/lib/workflow/labels";
 import { TASK_GATEWAY_QUESTION } from "@/lib/workflow/gateway-questions";
 import { advanceCase } from "./actions";
@@ -26,6 +26,7 @@ interface CaseRow {
   outcome: string | null;
   current_task_type: TaskType;
   delivery_due_at: string | null;
+  enviado_at: string | null;
   tume_clients: { name: string } | null;
   tume_profiles: { full_name: string } | null;
 }
@@ -59,7 +60,7 @@ export default async function CasoPage({
   const { data: caso, error: casoError } = await supabase
     .from("tume_cases")
     .select(
-      "id, code, title, description, type, budget_usd, quoted_amount_usd, is_express, stage, outcome, current_task_type, delivery_due_at, tume_clients(name), tume_profiles!tume_cases_created_by_fkey(full_name)",
+      "id, code, title, description, type, budget_usd, quoted_amount_usd, is_express, stage, outcome, current_task_type, delivery_due_at, enviado_at, tume_clients(name), tume_profiles!tume_cases_created_by_fkey(full_name)",
     )
     .eq("id", id)
     .maybeSingle<CaseRow>();
@@ -90,21 +91,10 @@ export default async function CasoPage({
   const uiKind = getTaskUiKind(currentTaskType);
 
   // enviar_cliente/enviar_no_cotizar se quedan como current_task_type incluso
-  // después de confirmados (no generan tarea siguiente): hay que mirar el
-  // status de la fila en tume_tasks para saber si el envío ya se confirmó o
-  // sigue pendiente de que gerente_comercial haga el check.
-  let isFinalConfirmed = false;
-  if (isFinalTask(currentTaskType)) {
-    const { data: currentTaskRow } = await supabase
-      .from("tume_tasks")
-      .select("status")
-      .eq("case_id", id)
-      .eq("task_type", currentTaskType)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<{ status: string }>();
-    isFinalConfirmed = currentTaskRow?.status === "done";
-  }
+  // después de confirmados (no generan tarea siguiente, ver task-ui.ts): sin
+  // enviado_at no habría forma de distinguir "ya confirmado" de "pendiente
+  // de confirmar el check" (0008_enviado_at.sql).
+  const isFinalConfirmed = caso.enviado_at != null;
 
   return (
     <AppLayout

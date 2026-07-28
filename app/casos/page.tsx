@@ -5,8 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { AppLayout } from "@/components/layout/app-layout";
 import { KanbanBoard, type KanbanCaseItem } from "@/components/cases/kanban-board";
 import { SlaBadge } from "@/components/cases/sla-badge";
+import { CaseStatusFilterSelect } from "@/components/cases/case-status-filter";
 import { TASK_LABEL, ROLE_LABEL } from "@/lib/workflow/labels";
 import { TASK_ROLE, type CaseOutcome, type CaseStage, type TaskType, type Role } from "@/lib/workflow/transitions";
+import { matchesStatusFilter, parseCaseStatusFilter } from "@/lib/cases/status";
+import { canCreateCase } from "@/lib/permissions";
 
 interface CaseListRow {
   id: string;
@@ -19,16 +22,18 @@ interface CaseListRow {
   current_task_type: TaskType;
   created_at: string;
   delivery_due_at: string | null;
+  enviado_at: string | null;
   tume_clients: { name: string } | null;
 }
 
 export default async function CasosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; estado?: string }>;
 }) {
-  const { view } = await searchParams;
+  const { view, estado } = await searchParams;
   const isKanban = view === "kanban";
+  const statusFilter = parseCaseStatusFilter(estado);
 
   const supabase = await createClient();
   const {
@@ -48,7 +53,7 @@ export default async function CasosPage({
   const { data: cases, error: casesError } = await supabase
     .from("tume_cases")
     .select(
-      "id, code, title, budget_usd, is_express, stage, outcome, current_task_type, created_at, delivery_due_at, tume_clients(name)",
+      "id, code, title, budget_usd, is_express, stage, outcome, current_task_type, created_at, delivery_due_at, enviado_at, tume_clients(name)",
     )
     .order("created_at", { ascending: false })
     .returns<CaseListRow[]>();
@@ -57,7 +62,12 @@ export default async function CasosPage({
     throw new Error(`No se pudieron cargar los casos: ${casesError.message}`);
   }
 
-  const caseItems = cases ?? [];
+  const caseItems = (cases ?? []).filter((caso) =>
+    matchesStatusFilter(caso, statusFilter),
+  );
+
+  // Preserva ?estado al cambiar entre vista Lista/Kanban.
+  const estadoQuery = estado ? `&estado=${estado}` : "";
 
   return (
     <AppLayout
@@ -67,10 +77,13 @@ export default async function CasosPage({
       description="Seguimiento y flujo de trabajo de cotizaciones en tiempo real."
       actions={
         <div className="flex items-center gap-2">
+          {/* Status Filter Combobox */}
+          <CaseStatusFilterSelect current={statusFilter} />
+
           {/* View Switcher Toggle */}
           <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
             <Link
-              href="/casos?view=list"
+              href={`/casos?view=list${estadoQuery}`}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
                 !isKanban
                   ? "bg-white text-slate-900 shadow-2xs"
@@ -81,7 +94,7 @@ export default async function CasosPage({
               <span>Lista</span>
             </Link>
             <Link
-              href="/casos?view=kanban"
+              href={`/casos?view=kanban${estadoQuery}`}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
                 isKanban
                   ? "bg-white text-slate-900 shadow-2xs"
@@ -93,13 +106,15 @@ export default async function CasosPage({
             </Link>
           </div>
 
-          <Link
-            href="/casos/nuevo"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-slate-800 transition-colors"
-          >
-            <PlusCircle className="size-3.5" />
-            <span>Nuevo Caso</span>
-          </Link>
+          {canCreateCase(profile?.role) && (
+            <Link
+              href="/casos/nuevo"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-slate-800 transition-colors"
+            >
+              <PlusCircle className="size-3.5" />
+              <span>Nuevo Caso</span>
+            </Link>
+          )}
         </div>
       }
     >
@@ -120,7 +135,9 @@ export default async function CasosPage({
 
           {caseItems.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-500">
-              No hay casos registrados actualmente.
+              {statusFilter === "todos"
+                ? "No hay casos registrados actualmente."
+                : "No hay casos que coincidan con este filtro."}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
